@@ -8,7 +8,7 @@ def calculate_loop(pub: int) -> int:
     loop = 0
     curr = 1
     while curr != pub:
-        curr = transform(curr, subj, today)
+        curr = transform(curr)
         loop += 1
     return loop
 
@@ -34,9 +34,6 @@ if __name__ == '__main__':
         lines = f.read().splitlines()
     card_pub, door_pub = lines
     card_pub, door_pub = int(card_pub), int(door_pub)
-
-    today = 20201227
-    subj = 7
 
     card_loop = calculate_loop(card_pub)
     door_loop = calculate_loop(door_pub)

@@ -1,106 +1,76 @@
 from typing import List, Any, Tuple, Iterable
 from collections import Counter
 import copy
-
-def pad_object(obj: List[Any], el: Any) -> None:
-    obj.insert(0, el)
-    obj.append(copy.deepcopy(el))
+import numpy as np
 
 
-def pad_grid(grid: List[List[List[List]]]) -> None:
-    dim_x = len(grid[0][0][0])
-    dim_y = len(grid[0][0])
-    dim_z = len(grid[0])
-    for cube in grid:
-        for layer in cube:
-            for i in range(len(layer)):
-                pad_object(layer[i], '.')
-            pad_object(layer, ['.' for l in range(dim_x + 2)])
-        pad_object(cube, [['.' for _l in range(dim_x+2)] for _j in range(dim_y+2)])
-
-    zero_cube = [[['.' for _l in range(dim_x+2)] for _j in range(dim_y+2)] for _k in range(dim_z+2)]
-    pad_object(grid, zero_cube)
+def pad_grid(grid: np.array) -> np.array:
+    new_grid = np.zeros((grid.shape[0] + 2, grid.shape[1] + 2, grid.shape[2] + 2, grid.shape[3] + 2), dtype=int)
+    new_grid[1:-1, 1:-1, 1:-1, 1:-1] = grid
+    return new_grid
 
 
-def get_neighbour_coor(coor: Tuple[int], grid: List[List[List[List]]]) -> List[List[int]]:
+def needs_padding(grid: np.array) -> bool:
 
-    dim_k = len(grid[0][0][0])
-    dim_j = len(grid[0][0])
-    dim_i = len(grid[0])
-    dim_h = len(grid)
-
-    h = coor[0]
-    hh = list(range(max(0, h - 1), min(dim_h, h + 2)))
-    i = coor[0]
-    ii = list(range(max(0, i-1), min(dim_i, i+2)))
-    j = coor[1]
-    jj = list(range(max(0, j-1), min(dim_j, j+2)))
-    k = coor[2]
-    kk = list(range(max(0, k-1), min(dim_k, k+2)))
-    neighbour_coor = [hh, ii, jj, kk]
-    # for i in ii:
-    #     for j in jj:
-    #         for k in kk:
-    #             if (i, j, k) != coor:
-    #                 neighbour_coor.append((i, j, k))
-    return neighbour_coor
+    if np.sum(
+            [np.sum(grid[0, :, :, :]),
+             np.sum(grid[-1, :, :, :]),
+             np.sum(grid[:, 0, :, :]),
+             np.sum(grid[:, -1, :, :]),
+             np.sum(grid[:, :, 0, :]),
+             np.sum(grid[:, :, -1, :]),
+             np.sum(grid[:, :, :, 0]),
+             np.sum(grid[:, :, :, -1])]):
+        return True
+    return False
 
 
-def count_neighbours(coor: Tuple[int], grid: List[List[List[List]]]) -> Counter:
-    cnt = Counter()
-    ranges = get_neighbour_coor(coor, grid)
-    subgrid_w = grid[ranges[0][0]:ranges[0][-1] + 1]
-    subgrid_z = [col[ranges[1][0]:ranges[1][-1] + 1] for col in subgrid_w]
-    subgrid_y = [[row[ranges[2][0]:ranges[2][-1] + 1] for row in col] for col in subgrid_z]
-
-    subgrid = [[[row[ranges[3][0]:ranges[3][-1] + 1]for row in col] for col in layer] for layer in subgrid_y]
-
-    for h, cube in enumerate(subgrid):
-        for i, layer in enumerate(cube):
-            for j, row in enumerate(layer):
-                for k, char in enumerate(row):
-
-                    cnt[char] += 1
-    if grid[coor[0]][coor[1]][coor[2]][coor[3]] == '#':
-        cnt['#'] -= 1
-    return cnt
+def init_grid(input_file: str) -> np.array:
+    with open(input_file, 'r') as f:
+        lines = f.read().splitlines()
+    for i in range(len(lines)):
+        lines[i] = np.array(list(lines[i].replace('#', '1').replace('.', '0')), dtype=int)
+    grid = np.array([[lines]])
+    grid = pad_grid(grid)
+    return grid
 
 
-with open('mock.txt', 'r') as f:
-    lines = f.read().splitlines()
+def cycle(grid: np.array) -> np.array:
+    new_grid = np.zeros(grid.shape, dtype=int)
+    for i, i_el in enumerate(grid):
+        for j, j_el in enumerate(i_el):
+            for k, k_el in enumerate(j_el):
+                for l, l_el in enumerate(k_el):
+                    i_min, i_max = max(i - 1, 0), min(i + 2, grid.shape[0])
+                    j_min, j_max = max(j - 1, 0), min(j + 2, grid.shape[1])
+                    k_min, k_max = max(k - 1, 0), min(k + 2, grid.shape[2])
+                    l_min, l_max = max(l - 1, 0), min(l + 2, grid.shape[3])
+                    cnt = Counter(list(np.ndarray.flatten(grid[i_min:i_max, j_min:j_max, k_min:k_max, l_min:l_max])))
+                    if l_el:
+                        active_cnt = cnt[1] - 1
+                        if active_cnt in [2, 3]:
+                            new_grid[i, j, k, l] = 1
+                    else:
+                        active_cnt = cnt[1]
+                        if active_cnt == 3:
+                            new_grid[i, j, k, l] = 1
 
-grid_init = [[[[char for char in line] for line in lines]]]
-grid = grid_init
+    if needs_padding(new_grid):
+
+        new_grid = pad_grid(new_grid)
+
+    return new_grid
 
 
-for cycle in range(6):
-    pad_grid(grid)
-    new_grid = copy.deepcopy(grid)
-    active_count = 0
-    for h, cube in enumerate(grid):
-        for i, layer in enumerate(cube):
-            for j, col in enumerate(layer):
-                for k, char in enumerate(col):
-                    actives = count_neighbours((h, i, j, k), grid)['#']
-                    if char == '.':
-                        if actives == 3:
-                            new_grid[h][i][j][k] = '#'
-                            active_count += 1
-                    elif char == '#':
-                        if 2 <= actives <= 3:
-                            active_count += 1
-                        else:
-                            new_grid[h][i][j][k] = '.'
-    grid = new_grid
-print(active_count)
+def main():
+    grid = init_grid('input.txt')
+
+    for i in range(6):
+        grid = cycle(grid)
+    print(np.sum(grid))
 
 
 
 
-
-
-
-pad_grid(grid_init)
-
-
-
+if __name__ == '__main__':
+    main()
