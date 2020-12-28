@@ -43,7 +43,7 @@ def get_patterns(rule: str, rule_dict: dict) -> str:
 
 
 if __name__ == '__main__':
-    with open('input.txt', 'r') as f:
+    with open('mock2.txt', 'r') as f:
         inp_list = f.read().splitlines()
 
     rule_list, strs = divide_inp(inp_list)
@@ -52,15 +52,15 @@ if __name__ == '__main__':
     for rule in rule_list:
         rule_dict[int(rule.split(':')[0])] = rule.split(':')[1].split('|')
 
-
-
-
     patterns = get_patterns(0, rule_dict)
 
     cnt = 0
+    valids = []
     for el in tqdm.tqdm(strs):
         for pattern in patterns:
             if pattern == el:
                 cnt += 1
+                valids.append(el)
                 break
     print(cnt)
+    print('\n'.join(valids))

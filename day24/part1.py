@@ -1,24 +1,19 @@
-from typing import Dict, List
+from collections import Counter
+from math import sqrt
+from typing import List, Tuple, Any
+import numpy as np
 
 
-def get_opposite_direction(direction: str) -> str:
-    if direction == 'se':
-        return 'nw'
-    elif direction == 'sw':
-        return 'ne'
-    elif direction == 'nw':
-        return 'se'
-    elif direction == 'ne':
-        return 'sw'
-    elif direction == 'e':
-        return 'w'
-    elif direction == 'w':
-        return 'e'
+poss_dirs = ['e', 'w', 'ne', 'nw', 'se', 'sw']
+e_vec = np.array([1, -1, 0])
+ne_vec = np.array([1, 0, -1])
+se_vec = np.array([0, -1, 1])
 
 
-def parse_line(tile_str: str) -> List[str]:
+def parse_instr(tile_str: str) -> List[str]:
     i = 0
-    instrs = []
+    instr_list = []
+    instr = None
     while i < len(tile_str):
         char = tile_str[i]
         if char == 's':
@@ -33,58 +28,55 @@ def parse_line(tile_str: str) -> List[str]:
         elif char == 'w':
             instr = char
             i += 1
-        instrs.append(instr)
-    return instrs
+        instr_list.append(instr)
+    return instr_list
 
 
-class Tile:
-    def __init__(self, tile_id: int) -> None:
-        self.tile_id = tile_id
-        self.flipped = False
-        self.neighbours: Dict[str, Tile] = {'w': None, 'e': None, 'sw': None, 'se': None, 'nw': None, 'ne': None}
+def count_dirs(dir_str: str) -> Counter:
+    instr_list = parse_instr(dir_str)
+    cnt = Counter(instr_list)
+    for direction in poss_dirs:
+        if direction not in cnt:
+            cnt[direction] = 0
+    return cnt
 
 
-class TileGrid:
-    def __init__(self) -> None:
-        self.ref_tile = Tile(0)
-        self.tiles = {0: self.ref_tile}
-        self.curr = self.ref_tile
-        self.next_id = 1
+def reduce_dirs(dir_cnt: Counter) -> Tuple[Any]:
+    e = dir_cnt['e'] - dir_cnt['w']
+    ne = dir_cnt['ne'] - dir_cnt['sw']
+    se = dir_cnt['se'] - dir_cnt['nw']
 
-    def populate_grid(self, radius: int):
-
-
-    def exec_instr(self, instr: str) -> None:
-        instr_list = parse_line(instr)
-        for instr in instr_list:
-            self._go(instr)
-        self._flip()
-        self.curr = self.ref_tile
-
-    def num_flipped(self) -> int:
-        count = 0
-        for tile in self.tiles.values():
-            if tile.flipped:
-                count += 1
-        return count
-
-    def _flip(self) -> None:
-        if self.curr.flipped:
-            print(f'{self.curr.tile_id} flipped to False')
-            self.curr.flipped = False
-        else:
-            print(f'{self.curr.tile_id} flipped to True')
-            self.curr.flipped = True
-
-    def _go(self, direction: str) -> None:
-        new_tile = self.curr.neighbours[direction]
-        self.curr = new_tile
+    # while ne * se > 0:
+    #     if ne > 0 and se > 0:
+    #         ne -= 1
+    #         se -= 1
+    #         e += 1
+    #     elif ne < 0 and se < 0:
+    #         ne += 1
+    #         se += 1
+    #         e -= 1
+    return e * e_vec + ne * ne_vec + se * se_vec
 
 
 if __name__ == '__main__':
-    with open('mock2.txt', 'r') as f:
+    with open('mock.txt', 'r') as f:
         lines = f.read().splitlines()
-    tg = TileGrid()
-    for line in lines:
-        tg.exec_instr(line)
-    print(tg.num_flipped())
+    flipped = {}
+    for i, line in enumerate(lines):
+        cnt = count_dirs(line)
+        coor = reduce_dirs(cnt)
+        coor_str = str(coor)
+
+        if coor_str in flipped:
+            val = flipped[coor_str]
+            if val:
+                flipped[coor_str] = False
+            else:
+                flipped[coor_str] = True
+        else:
+            flipped[coor_str] = True
+
+    cnt = Counter()
+    for tile in flipped.values():
+        cnt[tile] += 1
+    print(cnt)
